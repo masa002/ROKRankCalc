@@ -155,12 +155,15 @@ class AlliancePanel(wx.Panel):
         self.member_power_upd.Bind(wx.EVT_BUTTON, self.EditMemberTable)
         self.member_power_del.Bind(wx.EVT_BUTTON, self.EditMemberTable)
 
+        # リストボックスのイベント
+        self.member_power.Bind(wx.EVT_LISTBOX, self.SelectMemberTable)
+
     def ConnectDB(self):
         self.conn = sqlite3.connect('RankCalc.db')
         self.c = self.conn.cursor()
         try:
             # データの取得
-            # 同盟戦力
+            # 同盟データ
             self.c.execute('SELECT * FROM alliance WHERE alliance_name=?', (self.alliance_name,))
             _, alliance_power, alliance_kill, alliance_territory, pass_, shrine = self.c.fetchone()
             self.alliance_power.SetValue(str(alliance_power))
@@ -168,6 +171,11 @@ class AlliancePanel(wx.Panel):
             self.alliance_territory.SetValue(str(alliance_territory))
             self.pass_.SetValue(str(pass_))
             self.shrine.SetValue(str(shrine))
+
+            # メンバーデータ
+            self.c.execute('SELECT * FROM member WHERE alliance_name=?', (self.alliance_name,))
+            for row in self.c.fetchall():
+                self.member_power.Append(str(row[1]) + ':' + str(row[2]))
 
         except Exception as e:
             print(e)
@@ -193,23 +201,50 @@ class AlliancePanel(wx.Panel):
         member_name = self.member_power_name.GetValue()
         # 個人戦力
         member_power = self.member_power_val.GetValue()
+        # ボタン
+        btn = e.GetEventObject().GetLabel()
 
         if member_name == '' or member_power == '':
             return
 
-        if e.GetEventObject().GetLabel() == '追加':
+        # 重複チェック
+        self.c.execute('SELECT * FROM member WHERE member_name=?', (member_name,))
+        if self.c.fetchone() is not None:
+            if btn == '追加' or btn == '更新':
+                return
+
+        if btn == '追加':
             # 同盟名, 個人名, 個人戦力
             self.c.execute('INSERT INTO member VALUES (?, ?, ?)', (self.alliance_name, member_name, member_power))
             self.conn.commit()
-        elif e.GetEventObject().GetLabel() == '更新':
+        elif btn == '更新':
             # 同盟名, 個人名, 個人戦力
-            self.c.execute('UPDATE member SET member_power=? WHERE alliance_name=? AND member_name=?', (member_power, self.alliance_name, member_name))
+            self.c.execute('UPDATE member SET member_power=? WHERE member_name=?', (member_power, member_name))
             self.conn.commit()
-        elif e.GetEventObject().GetLabel() == '削除':
+        elif btn == '削除':
             # 同盟名, 個人名
-            self.c.execute('DELETE FROM member WHERE alliance_name=? AND member_name=?', (self.alliance_name, member_name))
+            self.c.execute('DELETE FROM member WHERE member_name=?', (member_name,))
             self.conn.commit()
-    
+
+        # リストボックスの更新
+        self.member_power.Clear()
+        self.c.execute('SELECT member_name, member_power FROM member WHERE alliance_name=?', (self.alliance_name,))
+        for member_data in self.c.fetchall():
+            self.member_power.Append(str(member_data[0] + ':' + str(member_data[1])))
+
+        # テキストボックスのクリア
+        self.member_power_name.Clear()
+        self.member_power_val.Clear()
+
+    def SelectMemberTable(self, e):
+        # 個人名
+        member_name = self.member_power.GetStringSelection().split(':')[0]
+        # 個人戦力
+        member_power = self.member_power.GetStringSelection().split(':')[1]
+        
+        self.member_power_name.SetValue(member_name)
+        self.member_power_val.SetValue(str(member_power))
+
 
 if __name__ == '__main__':
     app = wx.App()
