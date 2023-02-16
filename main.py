@@ -64,7 +64,7 @@ class AlliancePanel(wx.Panel):
 
 
         # 個人戦力のスクロールバー付きリストボックス
-        self.member_power = wx.ListBox(self, size=(280, 160), style=wx.LB_SINGLE)
+        self.member_power = wx.ListBox(self, size=(280, 160), style=wx.LB_SINGLE | wx.LB_HSCROLL)
         # 追加テキストボックス
         self.member_power_name = wx.TextCtrl(self, size=(100, -1))
         self.member_power_val = wx.TextCtrl(self, size=(100, -1))
@@ -172,10 +172,8 @@ class AlliancePanel(wx.Panel):
             self.pass_.SetValue(str(pass_))
             self.shrine.SetValue(str(shrine))
 
-            # メンバーデータ
-            self.c.execute('SELECT * FROM member WHERE alliance_name=?', (self.alliance_name,))
-            for row in self.c.fetchall():
-                self.member_power.Append(str(row[1]) + ':' + str(row[2]))
+            # メンバーデータの取得
+            self.UpdateMemberPower()
 
         except Exception as e:
             print(e)
@@ -227,10 +225,7 @@ class AlliancePanel(wx.Panel):
             self.conn.commit()
 
         # リストボックスの更新
-        self.member_power.Clear()
-        self.c.execute('SELECT member_name, member_power FROM member WHERE alliance_name=?', (self.alliance_name,))
-        for member_data in self.c.fetchall():
-            self.member_power.Append(str(member_data[0] + ':' + str(member_data[1])))
+        self.UpdateMemberPower()
 
         # テキストボックスのクリア
         self.member_power_name.Clear()
@@ -244,6 +239,13 @@ class AlliancePanel(wx.Panel):
         
         self.member_power_name.SetValue(member_name)
         self.member_power_val.SetValue(str(member_power))
+
+    def UpdateMemberPower(self):
+        # リストボックスの更新
+        self.member_power.Clear()
+        self.c.execute('SELECT member_name, member_power FROM member WHERE alliance_name=?', (self.alliance_name,))
+        for row in self.c.fetchall():
+            self.member_power.Append(str(row[0] + ':' + str(row[1])))
 
 
 if __name__ == '__main__':
