@@ -1,5 +1,6 @@
 import wx
 import os
+import math
 import sqlite3
 
 class RankCalc(wx.Frame):
@@ -41,26 +42,35 @@ class RankCalc(wx.Frame):
         self.nb.AddPage(AlliancePanel(self.nb, '同盟3'), '同盟3')
         self.nb.AddPage(AlliancePanel(self.nb, '同盟4'), '同盟4')
 
+        # タブが切り替わったときのイベント
+        self.nb.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.TabChange)
+
+    def TabChange(self, e):
+        # スコアを更新
+        self.nb.GetCurrentPage().CalcScore()
+
 class AlliancePanel(wx.Panel):
     def __init__(self, parent, alliance_name):
         super(AlliancePanel, self).__init__(parent)
         self.alliance_name = alliance_name
+
         self.InitUI()
         self.ConnectDB()
 
     def InitUI(self):
-        # 同盟戦力
-        self.alliance_power = wx.TextCtrl(self, size=(100, -1))
+        # 同盟戦力(0以上、上限なし)
+        self.alliance_power = wx.SpinCtrl(self, size=(100, -1), min=0, max=2147483647)
         # 同盟撃破数
-        self.alliance_kill = wx.TextCtrl(self, size=(100, -1))
+        self.alliance_kill = wx.SpinCtrl(self, size=(100, -1), min=0, max=2147483647)
         # 同盟領土数
-        self.alliance_territory = wx.TextCtrl(self, size=(100, -1))
+        self.alliance_territory = wx.SpinCtrl(self, size=(100, -1), min=0, max=2147483647)
         # 関所数
-        self.pass_ = wx.TextCtrl(self, size=(100, -1))
+        self.pass_ = wx.SpinCtrl(self, size=(100, -1), min=0, max=100)
         # 聖所数
-        self.shrine = wx.TextCtrl(self, size=(100, -1))
+        self.shrine = wx.SpinCtrl(self, size=(100, -1), min=0, max=100)
         # スコア
         self.score = wx.TextCtrl(self, size=(100, -1))
+        self.score.Disable()
 
 
         # 個人戦力のスクロールバー付きリストボックス
@@ -171,12 +181,68 @@ class AlliancePanel(wx.Panel):
             self.alliance_territory.SetValue(str(alliance_territory))
             self.pass_.SetValue(str(pass_))
             self.shrine.SetValue(str(shrine))
+            self.CalcScore()
 
             # メンバーデータの取得
             self.UpdateMemberPower()
 
         except Exception as e:
             print(e)
+
+    def CalcScore(self):
+        score_list = [100, 80, 50, 30]
+
+        # 同盟戦力をランキングに変換
+        self.c.execute('SELECT alliance_name, alliance_power FROM alliance ORDER BY alliance_power DESC')
+        alliance_power_rank = 0
+        for i, (alliance_name, alliance_power) in enumerate(self.c.fetchall()):
+            if self.alliance_name == alliance_name:
+                alliance_power_rank = i
+                break
+
+        # 同盟撃破数をランキングに変換
+        self.c.execute('SELECT alliance_name, alliance_kill FROM alliance ORDER BY alliance_kill DESC')
+        alliance_kill_rank = 0
+        for i, (alliance_name, alliance_kill) in enumerate(self.c.fetchall()):
+            if self.alliance_name == alliance_name:
+                alliance_kill_rank = i
+                break
+
+        # 同盟領土数をランキングに変換
+        self.c.execute('SELECT alliance_name, alliance_territory FROM alliance ORDER BY alliance_territory DESC')
+        alliance_territory_rank = 0
+        for i, (alliance_name, alliance_territory) in enumerate(self.c.fetchall()):
+            if self.alliance_name == alliance_name:
+                alliance_territory_rank = i
+                break
+
+        # メンバー戦力から2000000以上を抽出
+        member_power_score_list = [2000000, 3000000, 5000000, 10000000]
+        self.c.execute('SELECT member_power FROM member WHERE member_power >= 2000000 AND alliance_name=?', (self.alliance_name,))
+        member_power_list = self.c.fetchall()
+        member_power_sum = 0
+        for member_power in member_power_list:
+            if int(member_power[0]) >= member_power_score_list[3]:
+                member_power_sum += 100
+            elif int(member_power[0]) >= member_power_score_list[2]:
+                member_power_sum += 50
+            elif int(member_power[0]) >= member_power_score_list[1]:
+                member_power_sum += 30
+            elif int(member_power[0]) >= member_power_score_list[0]:
+                member_power_sum += 20
+
+
+        # スコア計算
+        total_score = 0
+        total_score += score_list[alliance_power_rank]
+        total_score += score_list[alliance_kill_rank]
+        total_score += score_list[alliance_territory_rank]
+        total_score += int(self.pass_.GetValue()) * 100
+        total_score += int(self.shrine.GetValue()) * 20
+        total_score += member_power_sum
+
+
+        self.score.SetValue(str(total_score))
 
     def UpdateAllianceTable(self, e):
         # 同盟戦力
@@ -189,6 +255,8 @@ class AlliancePanel(wx.Panel):
         pass_ = self.pass_.GetValue()
         # 聖所数
         shrine = self.shrine.GetValue()
+
+        self.CalcScore()
 
         # 同盟名, 同盟戦力, 同盟撃破数, 同盟領土数, 関所数, 聖所数
         self.c.execute('UPDATE alliance SET alliance_power=?, alliance_kill=?, alliance_territory=?, pass=?, shrine=? WHERE alliance_name=?', (alliance_power, alliance_kill, alliance_territory, pass_, shrine, self.alliance_name))
