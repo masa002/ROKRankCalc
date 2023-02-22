@@ -6,8 +6,6 @@ import sqlite3
 class RankCalc(wx.Frame):
     def __init__(self, parent, title):
         super(RankCalc, self).__init__(parent, title=title)
-
-        self.val = True
         
         self.CreateDB()
         self.InitUI()
@@ -64,13 +62,25 @@ class RankCalc(wx.Frame):
             self.nb.GetPage(i).CalcScore()
 
     def UpdateAllRadio(self, e):
+        print('UpdateAllRadio')
+        # ラジオボタンのラベル
+        event_lavel_list = ['中間', '最終']
         # イベント取得
         event = e.GetEventObject()
-        print(event.GetLabel())
+
+        if event.GetLabel() == event_lavel_list[0]:
+            val = False
+        elif event.GetLabel() == event_lavel_list[1]:
+            val = True
+        
         # ラジオボタンの更新
         for i in range(4):
-            self.nb.GetPage(i).radio_mid.SetValue(not self.val)
-            self.nb.GetPage(i).radio_fin.SetValue(self.val)
+            self.nb.GetPage(i).radio_mid.SetValue(not val)
+            self.nb.GetPage(i).radio_fin.SetValue(val)
+
+        # スコアを更新
+        for i in range(4):
+            self.nb.GetPage(i).UpdateAllianceTable(None)
 
 
 # 同盟ごとのパネル
@@ -335,12 +345,12 @@ class AlliancePanel(wx.Panel):
         # スコア計算(メンバーのみ)
         total_score += member_power_sum
 
-        RankCalc.SetRadio(self, self.CheckRadio())
-
         self.score.SetValue(str(total_score))
+    
 
     # 同盟テーブルの更新
     def UpdateAllianceTable(self, e):
+        print("UpdateAllianceTable")
         if self.CheckDate():
             table = self.table_list[0]
         else:
