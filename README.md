@@ -1,2 +1,4 @@
 # RankCalc
- ROK's calculator for events
+ ライキン推し活対抗戦用のスコア計算機です。
+ 
+ 現在の対抗戦に対応しているかは分からないのでご了承ください。
